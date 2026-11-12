@@ -1,0 +1,224 @@
+
+==================================================
+NOM A CREER : build.gradle
+==================================================
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}
+
+
+==================================================
+NOM A CREER : settings.gradle
+==================================================
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "IlesEtPonts"
+include ':app'
+
+
+==================================================
+NOM A CREER : app/build.gradle
+==================================================
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.plamdi.mbaya.ilesetponts'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.plamdi.mbaya.ilesetponts"   // à garder identique sur le store
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+
+==================================================
+NOM A CREER : app/src/main/AndroidManifest.xml
+==================================================
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Le jeu fonctionne hors ligne : aucune permission Internet n'est demandée.
+         Seule la vibration est utilisée, pour les retours tactiles. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.IlesEtPonts">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>
+
+
+==================================================
+NOM A CREER : app/src/main/java/com/plamdi/mbaya/ilesetponts/MainActivity.java
+==================================================
+package com.plamdi.mbaya.ilesetponts;
+
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.os.Bundle;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+/**
+ * Affiche le jeu (assets/index.html) dans une WebView plein écran.
+ * Tout est local : le jeu fonctionne sans connexion Internet.
+ */
+public class MainActivity extends Activity {
+
+    private WebView web;
+
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        web = new WebView(this);
+        WebSettings s = web.getSettings();
+        s.setJavaScriptEnabled(true);      // le jeu est écrit en JavaScript
+        s.setDomStorageEnabled(true);      // sauvegarde de la progression (localStorage)
+        s.setAllowFileAccess(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+
+        // Reste dans l'application : aucun lien ne s'ouvre dans un navigateur externe
+        web.setWebViewClient(new WebViewClient());
+        web.setWebChromeClient(new WebChromeClient());
+        web.setBackgroundColor(0xFF0A4C8C);
+
+        setContentView(web);
+        web.loadUrl("file:///android_asset/index.html");
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        web.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        web.onResume();
+    }
+
+    @Override
+    protected void onDestroy() {
+        web.destroy();
+        super.onDestroy();
+    }
+}
+
+
+==================================================
+NOM A CREER : app/src/main/res/values/strings.xml
+==================================================
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Îles et Ponts</string>
+</resources>
+
+
+==================================================
+NOM A CREER : app/src/main/res/values/themes.xml
+==================================================
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.IlesEtPonts" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0A4C8C</item>
+        <item name="android:navigationBarColor">#0A4C8C</item>
+    </style>
+</resources>
+
+
+==================================================
+NOM A CREER : .github/workflows/build-apk.yml
+==================================================
+# Compile l'APK dans le cloud (GitHub), sans ordinateur installé.
+# 1. Mets ce dossier IlesEtPonts dans un dépôt GitHub (privé ou public).
+# 2. Onglet « Actions » > « Build APK » > « Run workflow ».
+# 3. Quand c'est fini, télécharge l'artefact « IlesEtPonts-apk » : il contient app-debug.apk.
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Télécharger Three.js dans les assets
+        run: curl -fsSL -o app/src/main/assets/three.min.js https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+
+      - name: Supprimer les fichiers mal nommés
+        run: find app -name '* *' -delete
+
+      - name: Compiler l'APK de test
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IlesEtPonts-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
